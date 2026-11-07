@@ -134,6 +134,7 @@
       <a href="#traits"><span class="zh">6. 衍生特徵</span><span class="en">6. Traits</span></a>
       <a href="#stats"><span class="zh">7. 統計</span><span class="en">7. Statistics</span></a>
       <a href="#script"><span class="zh">完整 R 腳本</span><span class="en">Full R script</span></a>
+      <a href="#report"><span class="zh">9. 統計報告</span><span class="en">9. Statistics report</span></a>
       <a href="#cite"><span class="zh">引用</span><span class="en">Citation</span></a>
     </nav>
 
@@ -429,6 +430,12 @@ ancova_long |>
   anova_test(log2_area ~ age * sex + group, white.adjust = TRUE, effect.size = "pes")</code></pre>
         <div class="note zh"><span class="mono">clinical.csv</span> 的第一欄是醫院原始編號 <span class="mono">raw_sample</span>，不是 S1 這種專案編號。若合併後列數暴增，代表一筆臨床資料配到多個點，先用 <span class="mono">distinct</span> 檢查鍵。</div>
         <div class="note en">The first column of <span class="mono">clinical.csv</span> is the hospital ID <span class="mono">raw_sample</span>, not the project ID such as S1. If the join multiplies rows, one clinical record matched several spots; check the key with <span class="mono">distinct</span>.</div>
+      </section>
+
+      <section id="report">
+        <h2><span class="zh">下一頁：統計圖與質譜示意圖</span><span class="en">Next: statistics and a schematic spectrum</span></h2>
+        <p class="zh">上面的腳本停在矩陣、PCA 與 ANCOVA。同一批廣州發現隊列的定量結果，接在 <a href="https://hunglinchen2003.github.io/hcc-glycomics-report/">血清 N-聚醣統計報告</a>：各組質譜示意圖（峰上標出醣結構，再把四組合併）、火山圖、熱圖、臨床相關、箱形圖，以及邏輯斯迴歸的 ROC。那一頁也有中英切換，每張圖下面附上對應的 R 片段。</p>
+        <p class="en">The script above stops at the matrix, PCA, and ANCOVA. The same Guangzhou discovery matrix continues in the <a href="https://hunglinchen2003.github.io/hcc-glycomics-report/">serum N-glycomics report</a>: a group-wise schematic spectrum with glycan cartoons on the peaks and a merged overlay, then the volcano plot, heatmap, clinical correlations, box plots, and the logistic-regression ROC. That page has the same language switch, and each figure is followed by the R fragment that produces it.</p>
       </section>
 
       <section id="cite">
