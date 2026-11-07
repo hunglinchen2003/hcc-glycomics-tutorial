@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HCC serum N-glycomics: raw data to statistics</title>
+<style>
+  :root {
+    --bg: #f4f0e8;
+    --paper: #fffdf8;
+    --ink: #1c1915;
+    --muted: #5e574e;
+    --line: #e2d9cc;
+    --teal: #0c5c4c;
+    --teal-soft: #e5f3ef;
+    --clay: #8d3d32;
+    --clay-soft: #f8ebe7;
+    --gold: #8a5a12;
+    --code: #221e1a;
+    --shadow: 0 10px 30px rgba(60, 42, 20, 0.06);
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    color: var(--ink);
+    background:
+      radial-gradient(1200px 500px at 100% -10%, #efe4cf 0%, transparent 55%),
+      var(--bg);
+    font-family: "Segoe UI", "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    line-height: 1.65;
+  }
+  body[data-lang="zh"] .en { display: none !important; }
+  body[data-lang="en"] .zh { display: none !important; }
+  a { color: var(--teal); }
+  code, pre, .mono { font-family: Consolas, "Cascadia Mono", "Source Code Pro", monospace; }
+  .wrap { width: min(1120px, calc(100% - 32px)); margin: 0 auto; }
+  header.top {
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(244, 240, 232, 0.92);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+  }
+  .top-inner { display: flex; gap: 16px; align-items: center; justify-content: space-between; padding: 12px 0; }
+  .brand { font-weight: 700; letter-spacing: 0.01em; }
+  .brand small { display: block; font-weight: 500; color: var(--muted); font-size: 12px; }
+  .lang button, .copy {
+    border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+    border-radius: 999px; padding: 6px 12px; cursor: pointer; font: inherit;
+  }
+  .lang button[aria-pressed="true"] { background: var(--teal); color: white; border-color: var(--teal); }
+  .hero { padding: 42px 0 10px; }
+  .kicker {
+    display: inline-block; background: var(--teal-soft); color: var(--teal);
+    border-radius: 999px; padding: 4px 10px; font-size: 13px; font-weight: 700;
+  }
+  h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.15; margin: 12px 0; letter-spacing: -0.03em; }
+  .lede { font-size: 18px; max-width: 760px; color: #3a342c; }
+  .layout { display: grid; grid-template-columns: 230px 1fr; gap: 28px; padding-bottom: 64px; }
+  nav.toc { position: sticky; top: 74px; align-self: start; padding-top: 18px; }
+  nav.toc a { display: block; color: var(--muted); text-decoration: none; font-size: 14px; padding: 4px 0; }
+  nav.toc a:hover { color: var(--teal); }
+  section { background: var(--paper); border: 1px solid var(--line); border-radius: 18px; padding: 22px 24px; margin: 16px 0; box-shadow: var(--shadow); }
+  h2 { margin: 0 0 8px; font-size: 28px; letter-spacing: -0.02em; }
+  h3 { margin: 22px 0 8px; font-size: 20px; }
+  p { margin: 8px 0; }
+  ul, ol { margin: 8px 0 8px 1.2em; padding: 0; }
+  li + li { margin-top: 4px; }
+  .steps { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 14px; }
+  .step {
+    background: var(--bg); border-radius: 14px; padding: 12px; min-height: 118px;
+    border: 1px solid var(--line);
+  }
+  .step b { display: block; color: var(--teal); font-size: 13px; margin-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14.5px; margin: 10px 0 4px; }
+  th, td { text-align: left; vertical-align: top; padding: 8px 8px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 650; }
+  pre {
+    background: var(--code); color: #f6f1e8; border-radius: 12px; padding: 14px 14px 16px;
+    overflow: auto; position: relative; font-size: 13px; line-height: 1.5;
+  }
+  .copy { position: absolute; top: 8px; right: 8px; color: #1c1915; font-size: 12px; padding: 3px 8px; }
+  .note, .warn {
+    border-radius: 12px; padding: 10px 12px; margin: 12px 0;
+  }
+  .note { background: var(--teal-soft); }
+  .warn { background: var(--clay-soft); }
+  .tag { display: inline-block; border-radius: 999px; padding: 1px 8px; font-size: 12px; background: #efe7da; }
+  footer { color: var(--muted); font-size: 13px; padding: 8px 0 40px; }
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
+    nav.toc { position: static; }
+    .steps { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body data-lang="zh">
+<header class="top">
+  <div class="wrap top-inner">
+    <div class="brand">
+      <span class="zh">血清 N-聚醣體學教程</span>
+      <span class="en">Serum N-glycomics tutorial</span>
+      <small class="zh">從 MALDI 原始檔到聚醣定量與統計</small>
+      <small class="en">From MALDI raw files to glycan quantification and statistics</small>
+    </div>
+    <div class="lang" role="group" aria-label="Language">
+      <button type="button" id="btn-zh" aria-pressed="true">中文</button>
+      <button type="button" id="btn-en" aria-pressed="false">English</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="hero">
+    <span class="kicker">GPST000584 · HCC · teaching workflow</span>
+    <h1>
+      <span class="zh">從質譜原始資料到聚醣註釋與統計</span>
+      <span class="en">From mass-spectrometry raw data to glycan annotation and statistics</span>
+    </h1>
+    <p class="lede zh">這份獨立網頁用同一套公開的肝細胞癌（HCC）血清 N-聚醣資料，走完儀器原始檔、峰表、聚醣對應、樣本矩陣、品管、標準化，到分組統計。軟體能裝的都寫出安裝指令；商用峰擷取軟體則寫出必須在圖形介面完成的設定。</p>
+    <p class="lede en">This single page follows one public hepatocellular carcinoma (HCC) serum N-glycomics dataset from instrument raw files, through peak lists and glycan annotation, to a sample-by-glycan matrix, quality control, normalization, and group statistics. Install commands are given for the open tools. The commercial peak picker is covered as a graphical procedure.</p>
+  </div>
+
+  <div class="layout">
+    <nav class="toc">
+      <a href="#path"><span class="zh">流程</span><span class="en">Path</span></a>
+      <a href="#data"><span class="zh">這份資料</span><span class="en">The dataset</span></a>
+      <a href="#software"><span class="zh">軟體與安裝</span><span class="en">Software</span></a>
+      <a href="#raw"><span class="zh">1. 原始檔</span><span class="en">1. Raw files</span></a>
+      <a href="#peaks"><span class="zh">2. 峰表</span><span class="en">2. Peak lists</span></a>
+      <a href="#annotate"><span class="zh">3. 註釋聚醣</span><span class="en">3. Annotate</span></a>
+      <a href="#matrix"><span class="zh">4. 組成矩陣</span><span class="en">4. Matrix</span></a>
+      <a href="#qc"><span class="zh">5. 品管與校正</span><span class="en">5. QC</span></a>
+      <a href="#traits"><span class="zh">6. 衍生特徵</span><span class="en">6. Traits</span></a>
+      <a href="#stats"><span class="zh">7. 統計</span><span class="en">7. Statistics</span></a>
+      <a href="#script"><span class="zh">完整 R 腳本</span><span class="en">Full R script</span></a>
+      <a href="#cite"><span class="zh">引用</span><span class="en">Citation</span></a>
+    </nav>
+
+    <div>
+      <section id="path">
+        <h2><span class="zh">八步流程</span><span class="en">Eight steps</span></h2>
+        <p class="zh">統計課若已有峰表，從第 4 步開始。重現儀器端才需要第 1–2 步。</p>
+        <p class="en">A statistics class that already has peak lists starts at step 4. Steps 1–2 are only required to reproduce the instrument side.</p>
+        <div class="steps">
+          <div class="step"><b>01</b><span class="zh">Bruker MALDI 原始目錄（fid / acqu）</span><span class="en">Bruker MALDI raw directory (fid / acqu)</span></div>
+          <div class="step"><b>02</b><span class="zh">flexAnalysis 擷取單同位素峰，匯出 xlsx</span><span class="en">flexAnalysis exports monoisotopic peaks to xlsx</span></div>
+          <div class="step"><b>03</b><span class="zh">GlyHunter 校正 m/z 並對上聚醣組成</span><span class="en">GlyHunter calibrates m/z and assigns compositions</span></div>
+          <div class="step"><b>04</b><span class="zh">點位對上樣本編號，合成寬表</span><span class="en">Map spot positions onto sample IDs</span></div>
+          <div class="step"><b>05</b><span class="zh">缺值過濾、最小值一半填補、中位數商數標準化</span><span class="en">Filter, impute, median-quotient normalize</span></div>
+          <div class="step"><b>06</b><span class="zh">以板號做 ComBat 批次校正</span><span class="en">ComBat correction by MALDI plate</span></div>
+          <div class="step"><b>07</b><span class="zh">log2 後做 PCA、ANCOVA、事後比較</span><span class="en">log2, then PCA, ANCOVA, and post-hoc tests</span></div>
+          <div class="step"><b>08</b><span class="zh">可選：衍生特徵或 HCC 對照組分類</span><span class="en">Optional: derived traits or HCC classification</span></div>
+        </div>
+      </section>
+
+      <section id="data">
+        <h2><span class="zh">使用的公開資料</span><span class="en">Public data used here</span></h2>
+        <p class="zh">教材對應 Fu 等人的多中心血清 N-聚醣研究：健康、慢性 B 型肝炎（CHB）、肝硬化（LC）與 HCC。發現隊列在廣州（GD1），兩個外部隊列是廣州 II（GD2）與徐州（程式庫資料夾名為 cohort_SH，論文代號 XZ）。</p>
+        <p class="en">The lesson follows the multicenter serum N-glycome study by Fu and colleagues: healthy controls, chronic hepatitis B (CHB), liver cirrhosis (LC), and HCC. The discovery cohort is Guangzhou (GD1). The external cohorts are Guangzhou II (GD2) and Xuzhou (folder name cohort_SH, paper code XZ).</p>
+        <table>
+          <thead>
+            <tr><th><span class="zh">位置</span><span class="en">Location</span></th><th><span class="zh">角色</span><span class="en">Role</span></th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="mono">data\GlycoPOST_GPST000584\*_MALDI_raw.zip</td><td><span class="zh">儀器原始檔。每個點是 Bruker 目錄，內有 fid、acqu、acqus。</span><span class="en">Instrument raw data. Each spot is a Bruker directory containing fid, acqu, and acqus.</span></td></tr>
+            <tr><td class="mono">data\GlycoPOST_GPST000584\glyhunter_results_*.zip</td><td><span class="zh">作者已跑完的 GlyHunter CSV，可用來核對自己的註釋。</span><span class="en">Author-provided GlyHunter CSVs, useful for checking your own annotation.</span></td></tr>
+            <tr><td class="mono">data\HCC-N-glycome\data\cohort_GD1\mass_list\plate1.xlsx … plate8.xlsx</td><td><span class="zh">flexAnalysis 峰表。一張工作表是一個 MALDI 點。</span><span class="en">flexAnalysis peak lists. One worksheet is one MALDI spot.</span></td></tr>
+            <tr><td class="mono">plates.csv / MALDI_positions.csv / chosen_samples.csv / clinical.csv</td><td><span class="zh">板號、點位、分析用樣本、臨床變項。</span><span class="en">Plate, spot, analysis-set membership, and clinical variables.</span></td></tr>
+            <tr><td class="mono">human_serum_glycans.csv</td><td><span class="zh">組成（H5N4S2 這類寫法）與 GlycoCT 結構。</span><span class="en">Compositions such as H5N4S2, plus GlycoCT structures.</span></td></tr>
+          </tbody>
+        </table>
+        <p class="zh">組別代碼：原始編號字首 H、M、Y、C 分別改寫成 HC、CHB、LC、HCC。QC 是品管樣本，不當作疾病組。GD1 主分析人數是 HC 59、CHB 101、LC 112、HCC 310，另有 QC 24。</p>
+        <p class="en">Group codes: the prefixes H, M, Y, and C become HC, CHB, LC, and HCC. QC samples are quality controls and are not a disease group. The GD1 analysis set has 59 HC, 101 CHB, 112 LC, 310 HCC, and 24 QC.</p>
+        <div class="note zh">本機路徑以 <span class="mono">D:\Meta_analysis of glycomic data\</span> 為例。換電腦時只改這一段。</div>
+        <div class="note en">Examples use <span class="mono">D:\Meta_analysis of glycomic data\</span>. Change that prefix on another computer.</div>
+      </section>
+
+      <section id="software">
+        <h2><span class="zh">軟體需求與安裝</span><span class="en">Software and installation</span></h2>
+        <table>
+          <thead>
+            <tr><th><span class="zh">軟體</span><span class="en">Tool</span></th><th><span class="zh">用途</span><span class="en">Used for</span></th><th><span class="zh">是否必須</span><span class="en">Required</span></th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Bruker flexAnalysis 4.0</td><td><span class="zh">由 fid 產生峰表</span><span class="en">Peak lists from fid</span></td><td><span class="zh">只有重跑原始檔時需要。商用，隨儀器授權。</span><span class="en">Only when reprocessing raw files. Commercial, licensed with the instrument.</span></td></tr>
+            <tr><td>Python 3.10+ 與 pipx</td><td>GlyHunter</td><td><span class="zh">做聚醣註釋時需要</span><span class="en">Needed for glycan annotation</span></td></tr>
+            <tr><td>GlyHunter 0.1.6</td><td><span class="zh">m/z 校正與組成註釋</span><span class="en">m/z calibration and composition matching</span></td><td><span class="zh">做聚醣註釋時需要</span><span class="en">Needed for glycan annotation</span></td></tr>
+            <tr><td>R 4.3+</td><td><span class="zh">矩陣、標準化、統計、圖</span><span class="en">Matrix, normalization, statistics, plots</span></td><td><span class="zh">統計部分必須</span><span class="en">Required for the statistics half</span></td></tr>
+            <tr><td>tidyverse, readxl, rstatix, broom, sva</td><td><span class="zh">讀檔、檢定、ComBat</span><span class="en">Import, tests, ComBat</span></td><td><span class="zh">統計部分必須</span><span class="en">Required for the statistics half</span></td></tr>
+          </tbody>
+        </table>
+
+        <h3><span class="zh">Windows：Python 與 GlyHunter</span><span class="en">Windows: Python and GlyHunter</span></h3>
+        <p class="zh">先安裝 Python 3.10 或更新版本，安裝時勾選 Add python.exe to PATH。然後在 PowerShell：</p>
+        <p class="en">Install Python 3.10 or newer and enable Add python.exe to PATH. Then in PowerShell:</p>
+        <pre><button class="copy" type="button">copy</button><code>py -3 -m pip install --user pipx
+py -3 -m pipx ensurepath
+git clone --branch v0.1.6 --depth 1 https://github.com/fubin1999/glyhunter.git
+cd glyhunter
+pipx install .
+glyhunter init
+glyhunter --help</code></pre>
+        <p class="zh">若該版本標籤不存在，改克隆預設分支，並在教程裡記下實際的 git commit。第一次執行 <span class="mono">glyhunter init</span> 會在使用者目錄建立 <span class="mono">.glyhunter</span>，裡面有 <span class="mono">config.yaml</span> 與預設血清 N-聚醣資料庫。</p>
+        <p class="en">If that tag is missing, clone the default branch and record the commit you actually used. The first <span class="mono">glyhunter init</span> creates <span class="mono">.glyhunter</span> in the user directory, with <span class="mono">config.yaml</span> and the default serum N-glycan database.</p>
+
+        <h3><span class="zh">R 套件</span><span class="en">R packages</span></h3>
+        <pre><button class="copy" type="button">copy</button><code>install.packages(c("tidyverse", "readxl", "rstatix", "broom"))
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager")
+BiocManager::install("sva")</code></pre>
+        <div class="warn zh">flexAnalysis 沒有可供這份教程轉發的安裝檔。沒有 Bruker 授權時，直接使用已匯出的 <span class="mono">mass_list</span> xlsx，不要嘗試把 fid 當成文字檔讀進 R。</div>
+        <div class="warn en">flexAnalysis is not redistributed with this tutorial. Without a Bruker license, start from the exported <span class="mono">mass_list</span> workbooks. Do not read fid files into R as text.</div>
+      </section>
+
+      <section id="raw">
+        <h2><span class="zh">1. 讀懂原始檔</span><span class="en">1. Read the raw files</span></h2>
+        <p class="zh">GlycoPOST <span class="mono">GPST000584</span> 的原始檔是 zip。解開後每個 MALDI 點是一個資料夾，例如 <span class="mono">cohort_XZ_MALDI_raw/B19/0_B19/1/1SRef/</span>。質譜本體是二進位 <span class="mono">fid</span>，采集參數在 <span class="mono">acqu</span> 與 <span class="mono">acqus</span>。</p>
+        <p class="en">Raw files in GlycoPOST <span class="mono">GPST000584</span> are zip archives. After extraction, each MALDI spot is a folder such as <span class="mono">cohort_XZ_MALDI_raw/B19/0_B19/1/1SRef/</span>. The spectrum itself is the binary <span class="mono">fid</span>; acquisition parameters are in <span class="mono">acqu</span> and <span class="mono">acqus</span>.</p>
+        <ul>
+          <li><span class="zh"><span class="mono">cohort_GZI_MALDI_raw.zip</span>：廣州發現隊列</span><span class="en"><span class="mono">cohort_GZI_MALDI_raw.zip</span>: Guangzhou discovery cohort</span></li>
+          <li><span class="zh"><span class="mono">cohort_GZII_MALDI_raw.zip</span>：廣州外部驗證</span><span class="en"><span class="mono">cohort_GZII_MALDI_raw.zip</span>: Guangzhou external validation</span></li>
+          <li><span class="zh"><span class="mono">cohort_XZ_MALDI_raw.zip</span>：徐州外部驗證</span><span class="en"><span class="mono">cohort_XZ_MALDI_raw.zip</span>: Xuzhou external validation</span></li>
+          <li><span class="zh"><span class="mono">sia_iso_MALDI_raw.zip</span>：唾液酸鍵結特異性衍生化實驗</span><span class="en"><span class="mono">sia_iso_MALDI_raw.zip</span>: sialic-acid linkage-specific derivatization</span></li>
+          <li><span class="zh"><span class="mono">pooled_MALDI_raw.zip</span>：混合血清品管</span><span class="en"><span class="mono">pooled_MALDI_raw.zip</span>: pooled-serum quality control</span></li>
+        </ul>
+        <p class="zh">這些檔案回答「儀器量到什麼」。它們還不是「每個樣本每種聚醣的面積」。</p>
+        <p class="en">These files answer “what did the instrument record?”. They are not yet “an area for each glycan in each sample”.</p>
+      </section>
+
+      <section id="peaks">
+        <h2><span class="zh">2. 由原始檔產生峰表</span><span class="en">2. Turn raw files into peak lists</span></h2>
+        <p class="zh">在 flexAnalysis 4.0（build 14）對每張譜做下列處理，再把信噪比高於 3 的峰匯出成 xlsx。同一張 MALDI 板的點放在同一個活頁簿，每個點一張工作表。</p>
+        <p class="en">In flexAnalysis 4.0 (build 14), process each spectrum as follows, then export peaks with signal-to-noise above 3 to xlsx. Spots from the same MALDI plate go in one workbook, one worksheet per spot.</p>
+        <ol>
+          <li><span class="zh">基線扣除。</span><span class="en">Subtract the baseline.</span></li>
+          <li><span class="zh">重心化（centroid）。</span><span class="en">Centroid the spectrum.</span></li>
+          <li><span class="zh">用 SNAP 擷取單同位素峰，averagine 設為 <span class="mono">sugar_na</span>。這表示峰形用醣類、鈉加成離子來估。</span><span class="en">Pick monoisotopic peaks with SNAP and set averagine to <span class="mono">sugar_na</span>. The peak shape is modeled as a sodium-adducted glycan.</span></li>
+          <li><span class="zh">只保留 S/N &gt; 3。</span><span class="en">Keep peaks with S/N &gt; 3.</span></li>
+          <li><span class="zh">匯出 m/z、面積、強度與 S/N。後續定量用面積，不是強度。</span><span class="en">Export m/z, area, intensity, and S/N. Later quantification uses area, not intensity.</span></li>
+        </ol>
+        <p class="zh">GD1 的成品已在 <span class="mono">data\HCC-N-glycome\data\cohort_GD1\mass_list\</span>。GD2 與徐州各是一個 <span class="mono">mass_list.xlsx</span>。</p>
+        <p class="en">The finished GD1 workbooks are already in <span class="mono">data\HCC-N-glycome\data\cohort_GD1\mass_list\</span>. GD2 and Xuzhou each have one <span class="mono">mass_list.xlsx</span>.</p>
+      </section>
+
+      <section id="annotate">
+        <h2><span class="zh">3. 把峰對上聚醣</span><span class="en">3. Map peaks to glycans</span></h2>
+        <p class="zh">GlyHunter 讀取 flexAnalysis 的 xlsx，先用每張譜裡一定會出現的強峰做線性質量校正，再把校正後的 m/z 比對聚醣組成資料庫。容差內若有多個候選，預設留下 ppm 最小的一個。</p>
+        <p class="en">GlyHunter reads the flexAnalysis workbook, applies a linear mass calibration using strong peaks expected in every spectrum, then matches the calibrated m/z to a composition database. If several candidates fall inside the tolerance, the default is the one with the smallest ppm error.</p>
+        <h3><span class="zh">主實驗要核對的設定</span><span class="en">Settings to check for the main experiment</span></h3>
+        <p class="zh">論文方法寫明，校正用的五個 m/z 是 2271.837、1647.587、1967.71、1485.534、2417.895。電荷載體用 Na+。搜庫容差沿用 GlyHunter 設定檔的 <span class="mono">mz_tol</span>；本研究附帶的唾液酸異構體設定檔寫的是 50 ppm。開跑前用下面指令把設定抄出來檢查，不要只靠記憶。</p>
+        <p class="en">The paper calibrates on m/z 2271.837, 1647.587, 1967.71, 1485.534, and 2417.895. The charge carrier is Na+. The search tolerance is whatever <span class="mono">mz_tol</span> is in the GlyHunter config; the linkage-specific config shipped with this study sets 50 ppm. Copy the config and read it before a run.</p>
+        <pre><button class="copy" type="button">copy</button><code>glyhunter config --copy .
+# Edit calibration_by, charge_carrier, and mz_tol in the copied config.yaml.
+glyhunter run "D:\Meta_analysis of glycomic data\data\HCC-N-glycome\data\cohort_GD1\mass_list\plate1.xlsx" -c .\config.yaml -o .\plate1_glyhunter</code></pre>
+        <p class="zh">輸出資料夾裡，每張工作表一個 csv，另有三張總表：面積、強度、信噪比。串接樣本時用 <span class="mono">summary_area.csv</span>。聚醣欄是 <span class="mono">Hex(5)HexNAc(4)NeuAc(2)</span> 這類寫法，列名是譜圖名稱。</p>
+        <p class="en">The output folder has one CSV per worksheet plus three summaries: area, intensity, and signal-to-noise. Use <span class="mono">summary_area.csv</span> to build the sample matrix. Glycans look like <span class="mono">Hex(5)HexNAc(4)NeuAc(2)</span>, and the remaining columns are spectrum names.</p>
+        <div class="note zh">唾液酸鍵結實驗是另一套化學。該設定檔把 NeuAc 加上 +13.03 與 +16.05 Da，校正峰也不同（2277.87、2271.83、1970.73、1647.59）。不要把那份 yaml 套到主隊列。</div>
+        <div class="note en">The linkage-specific experiment is a different chemistry. Its config adds +13.03 and +16.05 Da to NeuAc and uses different calibrants (2277.87, 2271.83, 1970.73, 1647.59). Do not reuse that YAML for the main cohorts.</div>
+        <p class="zh">自訂資料庫時，每一行寫 <span class="mono">Hex(5)HexNAc(4)NeuAc(2) %</span>。百分號後面的質量 GlyHunter 會自己重算，可以留空。血清聚醣的簡寫 H、N、F、S 分別是 Hex、HexNAc、dHex、NeuAc。</p>
+        <p class="en">A custom database uses one line per composition: <span class="mono">Hex(5)HexNAc(4)NeuAc(2) %</span>. GlyHunter recalculates the mass after the percent sign. In the condensed serum notation, H, N, F, and S mean Hex, HexNAc, dHex, and NeuAc.</p>
+      </section>
+
+      <section id="matrix">
+        <h2><span class="zh">4. 從點位變成樣本 × 聚醣矩陣</span><span class="en">4. Build the sample-by-glycan matrix</span></h2>
+        <p class="zh">GlyHunter 的欄名仍是板子上的點，例如含有 <span class="mono">A1</span> 的譜名。<span class="mono">MALDI_positions.csv</span> 把「第幾板、哪個點」接到樣本編號 S1、S2。<span class="mono">plates.csv</span> 再提供醫院原始編號，字首決定組別。</p>
+        <p class="en">GlyHunter column names are still spot labels, such as a spectrum name containing <span class="mono">A1</span>. <span class="mono">MALDI_positions.csv</span> joins plate and spot to sample IDs such as S1. <span class="mono">plates.csv</span> carries the hospital ID, whose prefix determines the group.</p>
+        <pre><button class="copy" type="button">copy</button><code>library(tidyverse)
+
+root <- "D:/Meta_analysis of glycomic data/data/HCC-N-glycome/data/cohort_GD1"
+pos <- read_csv(file.path(root, "MALDI_positions.csv"), show_col_types = FALSE)
+plates <- read_csv(file.path(root, "plates.csv"), show_col_types = FALSE)
+
+# summary_area.csv is glycans x spectra. Adapt the regex to your sheet names.
+area <- read_csv("plate1_glyhunter/summary_area.csv", show_col_types = FALSE)
+long <- area |>
+  pivot_longer(-glycan, names_to = "spectrum", values_to = "area") |>
+  mutate(position = str_match(spectrum, "_([A-H](?:[1-9]|1\\d|2[0-4]))_")[, 2])
+
+plate1 <- long |>
+  inner_join(pos |> filter(plate == 1), by = "position") |>
+  transmute(
+    sample,
+    glycan = glycan |>
+      str_replace_all("Hex\\((\\d+)\\)", "H\\1") |>
+      str_replace_all("HexNAc\\((\\d+)\\)", "N\\1") |>
+      str_replace_all("dHex\\((\\d+)\\)", "F\\1") |>
+      str_replace_all("NeuAc\\((\\d+)\\)", "S\\1"),
+    area
+  )
+
+groups <- plates |>
+  mutate(group = case_when(
+    raw_sample == "QC" ~ "QC",
+    str_starts(raw_sample, "H") ~ "HC",
+    str_starts(raw_sample, "M") ~ "CHB",
+    str_starts(raw_sample, "Y") ~ "LC",
+    str_starts(raw_sample, "C") ~ "HCC"
+  )) |>
+  select(sample, raw_sample, group, plate)
+
+write_csv(plate1, "plate1_long.csv")
+write_csv(groups, "groups.csv")</code></pre>
+        <p class="zh">八張板都做完後，用 <span class="mono">complete(sample, glycan)</span> 把沒抽到的組合補成 NA，再 <span class="mono">pivot_wider</span>。列是樣本，欄是聚醣。缺的峰是 NA，不是 0：0 會被後面的標準化當成真正量到的值。</p>
+        <p class="en">After all eight plates, use <span class="mono">complete(sample, glycan)</span> so unobserved combinations become NA, then <span class="mono">pivot_wider</span>. Rows are samples and columns are glycans. A missing peak is NA, not 0. A zero would be treated as a real measured value during normalization.</p>
+      </section>
+
+      <section id="qc">
+        <h2><span class="zh">5. 品管、填補、標準化、批次</span><span class="en">5. QC, imputation, normalization, batch</span></h2>
+        <p class="zh">下面的規則與該研究分析腳本相同，並寫成可以獨立執行的函式。</p>
+        <p class="en">The rules match that study’s analysis script and are rewritten here as functions you can run on their own.</p>
+        <ol>
+          <li><span class="zh">只保留 <span class="mono">chosen_samples.csv</span> 裡的樣本。</span><span class="en">Keep samples listed in <span class="mono">chosen_samples.csv</span>.</span></li>
+          <li><span class="zh">去掉缺值比例 ≥ 50% 的樣本。該研究另外指定五個離群樣本：S231、S219、S243、S194、S212。</span><span class="en">Remove samples with at least 50% missing values. That study also removes five named outliers: S231, S219, S243, S194, S212.</span></li>
+          <li><span class="zh">在非 QC 樣本中，依組計算每個聚醣的檢出率。任一組檢出率 &gt; 50% 就保留該聚醣。</span><span class="en">Among non-QC samples, compute each glycan’s detection rate inside each group. Keep a glycan if any group detects it in more than 50% of samples.</span></li>
+          <li><span class="zh">剩餘缺值填該樣本最小正值的一半。</span><span class="en">Fill remaining missing values with half of that sample’s minimum positive value.</span></li>
+          <li><span class="zh">中位數商數標準化：每個聚醣先取跨樣本中位數當參考，每個樣本再除以「觀測值 / 參考值」的中位數。</span><span class="en">Median-quotient normalization: each glycan’s cross-sample median is the reference, and each sample is divided by the median of its value-to-reference quotients.</span></li>
+          <li><span class="zh">取自然對數後，用 <span class="mono">sva::ComBat</span> 以板號為批次、疾病組為要保護的變項，參考批次設為第 1 板，再指數還原。</span><span class="en">Take the natural log, run <span class="mono">sva::ComBat</span> with plate as the batch and disease group protected, using plate 1 as the reference batch, then exponentiate back.</span></li>
+        </ol>
+        <pre><button class="copy" type="button">copy</button><code>median_quotient_norm <- function(mat) {
+  ref <- apply(mat, 2, median, na.rm = TRUE)
+  quot <- sweep(mat, 2, ref, "/")
+  factors <- apply(quot, 1, median, na.rm = TRUE)
+  sweep(mat, 1, factors, "/")
+}</code></pre>
+        <div class="warn zh">ComBat 用自然對數；後面的檢定用 log2。兩次對數不要疊加。批次校正前要先有組別標籤，否則它會把疾病差異一起消掉。</div>
+        <div class="warn en">ComBat uses the natural log. The later tests use log2. Do not stack the two logs. Batch correction needs the group label, or it will also remove disease differences.</div>
+      </section>
+
+      <section id="traits">
+        <h2><span class="zh">6. 衍生特徵（可選）</span><span class="en">6. Derived traits (optional)</span></h2>
+        <p class="zh">單一組成很難對應生化路徑。衍生特徵把許多聚醣收成少數指標，例如分枝程度、核心岩藻糖化、半乳糖化、平分型 GlcNAc、唾液酸化。該論文用 GlyTrait 計算；GlyTrait 已由作者標成停用，現用的後續工具是 <a href="https://github.com/glycoverse/glydet">glydet</a>。結構字串在 <span class="mono">human_serum_glycans.csv</span> 的 GlycoCT 欄。</p>
+        <p class="en">A single composition is a weak proxy for a pathway. Derived traits collapse many glycans into a few indices: branching, core fucosylation, galactosylation, bisecting GlcNAc, and sialylation. The paper calculated them with GlyTrait. Its authors now mark GlyTrait as deprecated; the successor is <a href="https://github.com/glycoverse/glydet">glydet</a>. GlycoCT strings are in <span class="mono">human_serum_glycans.csv</span>.</p>
+        <p class="zh">教學上可以先手算一個透明的例子，確認方向再交給 glydet：</p>
+        <p class="en">In class, calculate one transparent example before handing the table to glydet:</p>
+        <pre><button class="copy" type="button">copy</button><code># Proportion of fucosylated glycans in one sample.
+# abundance is a named numeric vector of compositions such as H5N4F1S1.
+fucosylation <- function(abundance) {
+  fuc <- abundance[str_detect(names(abundance), "F[1-9]")]
+  sum(fuc, na.rm = TRUE) / sum(abundance, na.rm = TRUE)
+}</code></pre>
+      </section>
+
+      <section id="stats">
+        <h2><span class="zh">7. 統計分析</span><span class="en">7. Statistical analysis</span></h2>
+        <p class="zh">輸入是校正後的面積寬表，加上 <span class="mono">groups</span> 與 <span class="mono">clinical.csv</span>。臨床欄有年齡、性別、AST、ALT、GGT、ALB、TBIL、TP、AFP、Child-Pugh 與 TNM。QC 在模型前拿掉。</p>
+        <p class="en">The input is the corrected wide area table, plus <span class="mono">groups</span> and <span class="mono">clinical.csv</span>. Clinical columns include age, sex, AST, ALT, GGT, ALB, TBIL, TP, AFP, Child-Pugh, and TNM. Remove QC before modeling.</p>
+        <h3><span class="zh">先看整體形狀</span><span class="en">Look at the shape first</span></h3>
+        <pre><button class="copy" type="button">copy</button><code>log_mat <- log2(corrected_area)          # samples x glycans, no QC
+pca <- prcomp(log_mat, center = TRUE, scale. = TRUE)
+plot(pca$x[, 1], pca$x[, 2], col = groups_kept$group, pch = 19,
+     xlab = "PC1", ylab = "PC2")</code></pre>
+        <h3><span class="zh">論文使用的分組模型</span><span class="en">The study’s group model</span></h3>
+        <p class="zh">每個聚醣分別做 ANCOVA：<span class="mono">log2(面積) ~ 年齡 * 性別 + 組別</span>。組別順序是 HC、CHB、LC、HCC。用 White 校正處理變異數不齊，偏 eta 平方當效果量。全部聚醣的組別 p 值再用 Benjamini–Hochberg 校正。事後比較沿用同一條公式，只在組別之間兩兩看。</p>
+        <p class="en">Each glycan gets its own ANCOVA: <span class="mono">log2(area) ~ age * sex + group</span>. Group order is HC, CHB, LC, HCC. White’s adjustment handles unequal variance, and partial eta squared is the effect size. Benjamini–Hochberg is applied across glycans. Post-hoc tests use the same formula and compare groups pairwise.</p>
+        <pre><button class="copy" type="button">copy</button><code>library(rstatix)
+one <- ancova_long |>
+  filter(glycan == "H5N4F1S1") |>
+  anova_test(log2_area ~ age * sex + group, white.adjust = TRUE, effect.size = "pes")
+# Repeat by glycan with group_by(glycan), then adjust_pvalue(method = "BH").</code></pre>
+        <p class="zh">若要問「這些差異是不是只反映肝功能變差」，把 ALBI、TP、TBIL、GGT、AST、ALT、ALB 與 AST/ALT 比加進協變量。這是敏感度分析，不是第一張圖該用的模型。</p>
+        <p class="en">To ask whether the differences only reflect worsening liver function, add ALBI, TP, TBIL, GGT, AST, ALT, ALB, and the AST/ALT ratio as covariates. That is a sensitivity analysis, not the model for the first figure.</p>
+        <h3><span class="zh">和 AFP 放在同一個問題裡</span><span class="en">Put AFP in the same question</span></h3>
+        <p class="zh">HCC 對非 HCC 可以用聚醣矩陣做邏輯斯迴歸或正規化迴歸，再用同一批留出的樣本畫 ROC，和 AFP 的 ROC 比較。外部隊列 GD2、XZ 只能用來測試，不能再調參數。教程腳本把這一步留成最後一段，並把資料切成訓練與測試，避免用同一筆資料既選變項又報準確率。</p>
+        <p class="en">For HCC versus the other groups, a logistic or penalized regression on the glycan matrix can be scored by ROC on held-out samples and compared with AFP. GD2 and XZ are test sets only; do not retune on them. The script below keeps this as the last block and splits train from test so variable selection and the reported accuracy are not the same rows.</p>
+      </section>
+
+      <section id="script">
+        <h2><span class="zh">可執行的 R 腳本</span><span class="en">Runnable R script</span></h2>
+        <p class="zh">這段從「已經對好樣本編號的長表」開始，做完過濾、填補、標準化、PCA 與一個聚醣的 ANCOVA。把 <span class="mono">long_csv</span> 換成你在第 4 步寫出的檔案。若八張板尚未合併，先只跑 plate1 也可以看通流程。</p>
+        <p class="en">This block starts from a long table whose rows already carry sample IDs. It filters, imputes, normalizes, draws a PCA, and runs ANCOVA for one glycan. Point <span class="mono">long_csv</span> at the file written in step 4. A single plate is enough to see the path before all eight plates are combined.</p>
+        <pre><button class="copy" type="button">copy</button><code>library(tidyverse)
+library(rstatix)
+
+root <- "D:/Meta_analysis of glycomic data/data/HCC-N-glycome/data/cohort_GD1"
+long_csv <- "plate1_long.csv"   # columns: sample, glycan, area
+
+long <- read_csv(long_csv, show_col_types = FALSE)
+chosen <- read_csv(file.path(root, "chosen_samples.csv"), show_col_types = FALSE)
+clinical <- read_csv(file.path(root, "clinical.csv"), show_col_types = FALSE)
+groups <- read_csv("groups.csv", show_col_types = FALSE)
+
+dat <- long |>
+  filter(sample %in% chosen$sample) |>
+  mutate(area = na_if(area, 0))
+
+drop_samples <- dat |>
+  summarise(na_prop = mean(is.na(area)), .by = sample) |>
+  filter(na_prop >= 0.5) |>
+  pull(sample)
+drop_samples <- union(drop_samples, c("S231", "S219", "S243", "S194", "S212"))
+
+dat <- dat |> filter(!sample %in% drop_samples)
+
+keep_glycans <- dat |>
+  inner_join(groups, by = "sample") |>
+  filter(group != "QC") |>
+  summarise(detect = mean(!is.na(area)), .by = c(glycan, group)) |>
+  filter(detect > 0.5) |>
+  distinct(glycan) |>
+  pull(glycan)
+
+dat <- dat |>
+  filter(glycan %in% keep_glycans) |>
+  group_by(sample) |>
+  mutate(area = if_else(is.na(area), min(area, na.rm = TRUE) / 2, area)) |>
+  ungroup()
+
+wide <- dat |> pivot_wider(names_from = glycan, values_from = area)
+mat <- as.matrix(wide[, -1, drop = FALSE])
+rownames(mat) <- wide$sample
+norm <- sweep(mat, 1, apply(sweep(mat, 2, apply(mat, 2, median), "/"), 1, median), "/")
+
+meta <- groups |>
+  filter(sample %in% rownames(norm), group != "QC") |>
+  inner_join(clinical, by = "raw_sample") |>
+  distinct(sample, .keep_all = TRUE)
+
+log_mat <- log2(norm[meta$sample, , drop = FALSE])
+pca <- prcomp(log_mat, center = TRUE, scale. = TRUE)
+plot(pca$x[, 1:2], col = as.integer(factor(meta$group)), pch = 19)
+
+ancova_long <- as_tibble(log_mat, rownames = "sample") |>
+  pivot_longer(-sample, names_to = "glycan", values_to = "log2_area") |>
+  inner_join(meta |> select(sample, group, age, sex), by = "sample") |>
+  mutate(group = factor(group, levels = c("HC", "CHB", "LC", "HCC")))
+
+ancova_long |>
+  filter(glycan == names(sort(apply(log_mat, 2, var), decreasing = TRUE))[1]) |>
+  anova_test(log2_area ~ age * sex + group, white.adjust = TRUE, effect.size = "pes")</code></pre>
+        <div class="note zh"><span class="mono">clinical.csv</span> 的第一欄是醫院原始編號 <span class="mono">raw_sample</span>，不是 S1 這種專案編號。若合併後列數暴增，代表一筆臨床資料配到多個點，先用 <span class="mono">distinct</span> 檢查鍵。</div>
+        <div class="note en">The first column of <span class="mono">clinical.csv</span> is the hospital ID <span class="mono">raw_sample</span>, not the project ID such as S1. If the join multiplies rows, one clinical record matched several spots; check the key with <span class="mono">distinct</span>.</div>
+      </section>
+
+      <section id="cite">
+        <h2><span class="zh">引用與界線</span><span class="en">Citation and scope</span></h2>
+        <p class="zh">流程依據 Fu 等人，<em>Nature Communications</em>（2026），DOI <a href="https://doi.org/10.1038/s41467-026-68579-x">10.1038/s41467-026-68579-x</a>。原始檔：GlycoPOST <a href="https://glycopost.glycosmos.org/entry/GPST000584">GPST000584</a>。分析程式：<a href="https://github.com/fubin1999/HCC-N-glycome">fubin1999/HCC-N-glycome</a>，Zenodo <a href="https://doi.org/10.5281/zenodo.17773234">10.5281/zenodo.17773234</a>。GlyHunter：<a href="https://github.com/fubin1999/glyhunter">fubin1999/glyhunter</a>。</p>
+        <p class="en">The workflow follows Fu et al., <em>Nature Communications</em> (2026), DOI <a href="https://doi.org/10.1038/s41467-026-68579-x">10.1038/s41467-026-68579-x</a>. Raw files: GlycoPOST <a href="https://glycopost.glycosmos.org/entry/GPST000584">GPST000584</a>. Analysis code: <a href="https://github.com/fubin1999/HCC-N-glycome">fubin1999/HCC-N-glycome</a>, Zenodo <a href="https://doi.org/10.5281/zenodo.17773234">10.5281/zenodo.17773234</a>. GlyHunter: <a href="https://github.com/fubin1999/glyhunter">fubin1999/glyhunter</a>.</p>
+        <p class="zh">這份網頁是獨立教材，不是該論文的官方文件。組成註釋不等於完整結構或鍵結異構體；主實驗的 MALDI 面積不能分開 α2,3 與 α2,6 唾液酸，那是 sialic-acid linkage 那一批的工作。</p>
+        <p class="en">This page is an independent teaching guide, not an official supplement. A composition match is not a full structure or a linkage isomer. Areas from the main MALDI experiment do not separate α2,3 from α2,6 sialic acid; that is what the linkage-specific batch is for.</p>
+      </section>
+    </div>
+  </div>
+  <footer>
+    <span class="zh">教材網頁可離線開啟。切換語言只改顯示，不需要重新下載。</span>
+    <span class="en">This page works offline. The language switch only changes what is shown.</span>
+  </footer>
+</main>
+<script>
+  const body = document.body;
+  const btnZh = document.getElementById("btn-zh");
+  const btnEn = document.getElementById("btn-en");
+  function setLang(lang) {
+    body.dataset.lang = lang;
+    document.documentElement.lang = lang === "zh" ? "zh-Hant" : "en";
+    btnZh.setAttribute("aria-pressed", String(lang === "zh"));
+    btnEn.setAttribute("aria-pressed", String(lang === "en"));
+    try { localStorage.setItem("glyco-tutorial-lang", lang); } catch (e) {}
+  }
+  btnZh.addEventListener("click", () => setLang("zh"));
+  btnEn.addEventListener("click", () => setLang("en"));
+  try {
+    const saved = localStorage.getItem("glyco-tutorial-lang");
+    if (saved === "en" || saved === "zh") setLang(saved);
+  } catch (e) {}
+  document.querySelectorAll("pre").forEach((block) => {
+    const button = block.querySelector(".copy");
+    if (!button) return;
+    button.addEventListener("click", async () => {
+      const code = block.querySelector("code").innerText;
+      try {
+        await navigator.clipboard.writeText(code);
+        button.textContent = body.dataset.lang === "zh" ? "已複製" : "copied";
+      } catch (e) {
+        button.textContent = "copy";
+      }
+      setTimeout(() => { button.textContent = "copy"; }, 1200);
+    });
+  });
+</script>
+</body>
+</html>
